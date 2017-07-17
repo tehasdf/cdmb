@@ -1,0 +1,169 @@
+plugins:
+  docker2:
+    executor: central_deployment_agent
+    install: false
+
+node_types:
+  docker2.Docker:
+    derived_from: cloudify.nodes.Compute
+    properties:
+      ip:
+        default: '127.0.0.1'
+      connection_kwargs:
+        default: {}
+      tls:
+        type: boolean
+        default: false
+      tls_settings:
+        default: {}
+      agent_config:
+        default:
+          install_method: none
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.tasks.prepare_client
+
+  docker2.machine.Docker:
+    derived_from: docker2.Docker
+    properties:
+      name:
+        type: string
+        default: null
+      driver:
+        type: string
+        default: virtualbox
+      external:
+        type: boolean
+        default: false
+      keep:
+        type: boolean
+        default: false
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.machine.create_machine
+        delete:
+          implementation: docker2.docker_plugin2.machine.delete_machine
+
+  docker2.SwarmNode:
+    derived_from: cloudify.nodes.Root
+    properties:
+      swarm_port:
+        default: 5000
+      swarm_init:
+        default: false
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.swarm.start_swarm
+
+
+  docker2.Image:
+    derived_from: cloudify.nodes.Root
+    properties:
+      dockerfile:
+        type: string
+        default: ''
+      repository:
+        type: string
+        default: ''
+      tag:
+        type: string
+        default: latest
+      image_name:
+        type: string
+        default: ''
+      keep:
+        type: boolean
+        default: false
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.tasks.build_image
+        delete:
+          implementation: docker2.docker_plugin2.tasks.delete_image
+
+  docker2.Container:
+    derived_from: cloudify.nodes.Root
+    properties:
+      name:
+        type: string
+        default: null
+      command:
+        default: null
+      port_bindings:
+        default: {}
+      additional_create_parameters:
+        default: {}
+      consul_addr:
+        default: ''
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.tasks.create_container
+        start:
+          implementation: docker2.docker_plugin2.tasks.start_container
+        stop:
+          implementation: docker2.docker_plugin2.tasks.stop_container
+        delete:
+          implementation: docker2.docker_plugin2.tasks.delete_container
+
+  docker2.Network:
+    derived_from: cloudify.nodes.Root
+    properties:
+      name:
+        type: string
+        default: null
+      driver:
+        type: string
+        default: null
+      options:
+        default: {}
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        configure:
+          implementation: docker2.docker_plugin2.tasks.create_network
+        delete:
+          implementation: docker2.docker_plugin2.tasks.delete_network
+
+  docker2.Volume:
+    derived_from: cloudify.nodes.Root
+    properties:
+      name:
+        default: null
+      driver:
+        default: local
+      driver_opts:
+        default: {}
+      mount_at:
+        type: string
+      mode:
+        default: 'rw'
+      source:
+        default: null
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.tasks.create_volume
+        delete:
+          implementation: docker2.docker_plugin2.tasks.delete_volume
+
+relationships:
+  docker2.container_connected_to_container:
+    derived_from: cloudify.relationships.connected_to
+
+  docker2.container_inside_host:
+    derived_from: cloudify.relationships.contained_in
+
+  docker2.container_connected_to_network:
+    derived_from: cloudify.relationships.connected_to
+
+  docker2.container_connected_to_volume:
+    derived_from: cloudify.relationships.connected_to
+
+  docker2.container_from_image:
+    derived_from: cloudify.relationships.depends_on
+
+  docker2.connected_to_swarm_manager:
+    derived_from: cloudify.relationships.connected_to

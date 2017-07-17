@@ -1,0 +1,334 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/3.5m1/types.yaml
+  - plugins/docker2/plugin.yaml
+  - plugins/cdmb/plugin.yaml
+
+inputs:
+  swarm_manager_cacert_path:
+    default: /var/lib/boot2docker/ca.pem
+  swarm_manager_client_cert_path:
+    default: /var/lib/boot2docker/server.pem
+  swarm_manager_client_key_path:
+    default: /var/lib/boot2docker/server-key.pem
+  machines_external:
+    default: true
+  keep_machines:
+    default: true
+
+node_templates:
+  consul_machine:
+    type: docker2.machine.Docker
+    properties:
+      name: con0
+      external: {get_input: machines_external}
+      keep: {get_input: keep_machines}
+      tls: true
+      tls_settings: &docker_machine_tls_settings
+        client_cert:
+          - /home/asdf/.docker/machine/certs/cert.pem
+          - /home/asdf/.docker/machine/certs/key.pem
+        ca_cert: /home/asdf/.docker/machine/certs/ca.pem
+
+  machine0:
+    type: docker2.machine.Docker
+    properties:
+      name: n0
+      external: {get_input: machines_external}
+      keep: {get_input: keep_machines}
+      tls: true
+      tls_settings: *docker_machine_tls_settings
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.machine.create_machine
+          inputs:
+            engine_opts:
+              'cluster-store': {
+                  concat: [
+                    'consul://',
+                    {get_attribute: [consul, host_ip]},
+                    ':8500'
+                  ]
+                }
+              'cluster-advertise': 'eth1:2376'
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: consul
+
+  machine1:
+    type: docker2.machine.Docker
+    properties:
+      name: n1
+      external: {get_input: machines_external}
+      keep: {get_input: keep_machines}
+      tls: true
+      tls_settings: *docker_machine_tls_settings
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.machine.create_machine
+          inputs:
+            engine_opts:
+              'cluster-store': {
+                  concat: [
+                    'consul://',
+                    {get_attribute: [consul, host_ip]},
+                    ':8500'
+                  ]
+                }
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: consul
+
+  consul_image:
+    type: docker2.Image
+    properties:
+      repository: progrium/consul
+      tag: latest
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: consul_machine
+
+  consul:
+    type: docker2.Container
+    properties:
+      name: consul
+      command: ['-server', '-bootstrap']
+      port_bindings:
+        8500: 8500
+    relationships:
+      - type: docker2.container_inside_host
+        target: consul_machine
+      - type: docker2.container_from_image
+        target: consul_image
+
+  swarm_image:
+    type: docker2.Image
+    properties:
+      repository: swarm
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine0
+
+  swarm_image_machine1:
+    type: docker2.Image
+    properties:
+      repository: swarm
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine1
+
+  busybox_image:
+    type: docker2.Image
+    properties:
+      repository: busybox
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine0
+
+  swarm_ca_cert:
+    type: docker2.Volume
+    properties:
+      mount_at: {get_input: swarm_manager_cacert_path}
+      source: {get_input: swarm_manager_cacert_path}
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine0
+
+
+  swarm_client_cert:
+    type: docker2.Volume
+    properties:
+      mount_at: {get_input: swarm_manager_client_cert_path}
+      source: {get_input: swarm_manager_client_cert_path}
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine0
+
+  swarm_client_key:
+    type: docker2.Volume
+    properties:
+      mount_at: {get_input: swarm_manager_client_key_path}
+      source: {get_input: swarm_manager_client_key_path}
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine0
+
+  swarm_manager:
+    type: docker2.Container
+    properties:
+      name: swarm_manager
+      port_bindings:
+        4000: 4000
+      additional_create_parameters:
+        ports: [4000]
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine0
+      - type: docker2.container_from_image
+        target: swarm_image
+      - type: cloudify.relationships.depends_on
+        target: consul
+      - type: docker2.container_connected_to_volume
+        target: swarm_ca_cert
+      - type: docker2.container_connected_to_volume
+        target: swarm_client_key
+      - type: docker2.container_connected_to_volume
+        target: swarm_client_cert
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.tasks.create_container
+          inputs:
+            command: [
+              'manage',
+              '-H',
+              ':4000',
+              '--tlsverify',
+              '--tls',
+              '--tlscacert',
+              {get_input: swarm_manager_cacert_path},
+              '--tlscert',
+              {get_input: swarm_manager_client_cert_path},
+              '--tlskey',
+              {get_input: swarm_manager_client_key_path},
+              '--replication',
+              '--advertise',
+              {
+                concat: [
+                  {get_attribute: [machine0, ip]},
+                  ':4000'
+                ]
+              },
+              {
+                concat: [
+                  'consul://',
+                  {get_attribute: [consul, host_ip]},
+                  ':8500'
+                ]
+              }
+            ]
+
+  swarm_node:
+    type: docker2.Container
+    properties:
+      name: swarm_node0
+    relationships:
+      - type: docker2.container_inside_host
+        target: machine1
+      - type: docker2.container_from_image
+        target: swarm_image_machine1
+      - type: cloudify.relationships.depends_on
+        target: consul
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.tasks.create_container
+          inputs:
+            command: [
+              'join',
+              '--addr',
+              {
+                concat: [
+                  {get_attribute: [machine1, ip]},
+                  ':2376'
+                ]
+              },
+              {
+                concat: [
+                  'consul://',
+                  {get_attribute: [consul, host_ip]},
+                  ':8500'
+                ]
+              }
+            ]
+
+
+  swarm_docker:
+    type: docker2.Docker
+    properties:
+      tls: true
+      tls_settings: *docker_machine_tls_settings
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: swarm_manager
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: docker2.docker_plugin2.tasks.prepare_client
+          inputs:
+            base_url: {concat: [
+              {get_attribute: [swarm_manager, host_ip]},
+              ':4000'
+              ]}
+
+
+  es_rest_network:
+    type: docker2.Network
+    properties:
+      options:
+        driver: overlay
+    relationships:
+      - type: docker2.container_inside_host
+        target: swarm_docker
+
+  # rest_config:
+  #   type: docker2.Volume
+  #   properties:
+  #     mount_at: /mnt/config
+  #     source: /tmp/rest_config
+  #   relationships:
+  #     - type: docker2.container_inside_host
+  #       target: localhost
+
+  # rest_image:
+  #   type: docker2.Image
+  #   properties:
+  #     dockerfile: components/restservice
+  #     image_name: cdmb/restservice
+  #     keep: true
+  #   relationships:
+  #     - type: docker2.container_inside_host
+  #       target: swarm_docker
+
+  # restservice:
+  #   type: docker2.Container
+  #   relationships:
+  #     - type: docker2.container_inside_host
+  #       target: swarm_docker
+  #     - type: docker2.container_from_image
+  #       target: rest_image
+  #     - type: docker2.container_connected_to_network
+  #       target: es_rest_network
+  #     # - type: docker2.container_connected_to_container
+  #     #   target: elasticsearch
+  #     # - type: cdmb.rest_config_to_rest
+  #     #   target: rest_config
+
+  es_image:
+    type: docker2.Image
+    properties:
+      repository: elasticsearch
+      tag: 1
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: swarm_docker
+
+  elasticsearch:
+    type: docker2.Container
+    properties:
+      name: elasticsearch
+    relationships:
+      - type: docker2.container_inside_host
+        target: swarm_docker
+      - type: docker2.container_from_image
+        target: es_image
+      - type: docker2.container_connected_to_network
+        target: es_rest_network

@@ -1,0 +1,65 @@
+plugins:
+  cdmb:
+    executor: central_deployment_agent
+    install: false
+
+
+node_types:
+  cdmb.mgmtworker_config:
+    derived_from: docker2.Volume
+    properties:
+      mount_at:
+        default: /opt/mgmtworker/work
+      log_level:
+        default: INFO
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          implementation: cdmb.cdmb.tasks.prepare_mgmtworker_config
+
+  cdmb.restservice_config:
+    derived_from: docker2.Volume
+    properties:
+      mount_at:
+        default: /opt/manager/work
+      log_level:
+        default: INFO
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          implementation: cdmb.cdmb.tasks.prepare_rest_config
+
+  cdmb.es_data:
+    derived_from: docker2.Volume
+    properties:
+      mount_at:
+        default: /usr/share/elasticsearch/data
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          implementation: cdmb.cdmb.tasks.create_es_index
+
+  cdmb.nginx_config:
+    derived_from: docker2.Volume
+    properties:
+      mount_at:
+        default: /etc/nginx/nginx.conf
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          implementation: cdmb.cdmb.tasks.prepare_nginx_config
+
+relationships:
+  cdmb.config_to_rabbitmq:
+    derived_from: cloudify.relationships.depends_on
+    source_interfaces:
+      cloudify.interfaces.relationship_lifecycle:
+        preconfigure:
+          implementation: cdmb.cdmb.tasks.add_rabbitmq_address
+
+  cdmb.config_to_elasticsearch:
+    derived_from: cloudify.relationships.depends_on
+    source_interfaces:
+      cloudify.interfaces.relationship_lifecycle:
+        preconfigure:
+          implementation: cdmb.cdmb.tasks.add_elasticsearch_address
