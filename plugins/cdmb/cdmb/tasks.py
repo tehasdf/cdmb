@@ -20,12 +20,28 @@ def prepare_rest_config(client, ctx):
         os.path.join(config_dir, 'cloudify-rest.conf'))
 
     with open(os.path.join(config_dir, 'rest-security.conf'), 'w') as f:
-        f.write('{}')
+        json.dump({
+            "hash_salt": "+of8JJq71FGu1vCSeq261DNe9Rx05UGTrZ79nGkw/cY=",
+            "encoding_block_size": 24,
+            "secret_key": "cYSOvycw7p87Z95jR6V1qqfAcb0Koxh43TOz0+KJ+/0=",
+            "encoding_alphabet": "dFUBRql96EjZ0Cy4b2NOPLVzGAk3WuH",
+            "encoding_min_length": 5
+        }, f)
 
     try:
         copy_to_volume(client, volume_mountpoint, config_dir)
     finally:
         shutil.rmtree(config_dir)
+
+
+@with_docker_client('source')
+def prepare_database(client, ctx):
+    container = client.containers.get(
+        ctx.source.instance.runtime_properties['container_id'])
+    container.exec_run([
+        'bash', '-c',
+        'source /opt/manager/work/env && /opt/manager/env/bin/python /opt/create_tables_and_add_defaults.py'  # NOQA
+    ])
 
 
 @with_docker_client()
@@ -72,11 +88,11 @@ def add_rabbitmq_address(ctx):
         'rabbitmq_network']['ip']
 
 
-def add_elasticsearch_address(ctx):
-    ctx.source.instance.runtime_properties['es_endpoint_ip'] = \
+def add_postgres_address(ctx):
+    ctx.source.instance.runtime_properties['pg_endpoint_ip'] = \
         ctx.target.instance.runtime_properties['networks'][
-        'elasticsearch_network']['ip']
-    ctx.source.instance.runtime_properties['es_endpoint_port'] = 9200
+        'postgres_network']['ip']
+    ctx.source.instance.runtime_properties['pg_endpoint_port'] = 5432
 
 
 PREPARE_ES_CALLS = [

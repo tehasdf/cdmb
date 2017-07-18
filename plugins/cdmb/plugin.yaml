@@ -57,9 +57,16 @@ relationships:
         preconfigure:
           implementation: cdmb.cdmb.tasks.add_rabbitmq_address
 
-  cdmb.config_to_elasticsearch:
+  cdmb.config_to_postgres:
     derived_from: cloudify.relationships.depends_on
     source_interfaces:
       cloudify.interfaces.relationship_lifecycle:
         preconfigure:
-          implementation: cdmb.cdmb.tasks.add_elasticsearch_address
+          implementation: cdmb.cdmb.tasks.add_postgres_address
+
+  cdmb.restservice_to_postgres:
+    derived_from: docker2.container_connected_to_network
+    source_interfaces:
+      cloudify.interfaces.relationship_lifecycle:
+        establish:
+          implementation: cdmb.cdmb.tasks.prepare_database

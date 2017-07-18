@@ -24,11 +24,13 @@ RUN mkdir -p /var/log/cloudify/rest
 RUN mkdir /opt/manager
 RUN virtualenv /opt/manager/env
 COPY rest-requirements.txt /opt/rest-requirements.txt
+COPY create_tables_and_add_defaults.py /opt/create_tables_and_add_defaults.py
 RUN /opt/manager/env/bin/pip install -r /opt/rest-requirements.txt
 RUN /opt/manager/env/bin/pip install -e /opt/cloudify-plugins-common
 RUN /opt/manager/env/bin/pip install -e /opt/cloudify-agent
 RUN /opt/manager/env/bin/pip install -e /opt/cloudify-manager/workflows
 RUN /opt/manager/env/bin/pip install -e /opt/cloudify-manager/rest-service
+RUN /opt/manager/env/bin/pip install psycopg2
 
 
 VOLUME /opt/manager/work

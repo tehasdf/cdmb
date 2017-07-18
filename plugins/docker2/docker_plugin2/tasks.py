@@ -163,7 +163,6 @@ def find_connected_nodes(ctx, kind, make_details=None):
 def make_connected_containers_networks(client, ctx, connected_containers):
     container_details = {}
     networks = {}
-
     for target_name, container_rel in connected_containers.items():
         container_instance = container_rel.target.instance
         target_client = docker_client_for_instance(container_instance)
@@ -230,7 +229,8 @@ def create_container(client, ctx, **override_parameters):
         'volumes': volumes_config,
         'command': ctx.node.properties['command'],
         'name': ctx.node.properties['name'],
-        'ports': ctx.node.properties['port_bindings']
+        'ports': ctx.node.properties['port_bindings'],
+        'environment': ctx.node.properties['environment']
     }
     parameters.update(ctx.node.properties['additional_create_parameters'])
     parameters.update(**override_parameters)

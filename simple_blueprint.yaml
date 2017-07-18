@@ -10,6 +10,74 @@ node_templates:
   localhost:
     type: docker2.Docker
 
+
+  postgres_network:
+    type: docker2.Network
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+
+  postgresql_image:
+    type: docker2.Image
+    properties:
+      repository: postgres
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+
+  postgresql:
+    type: docker2.Container
+    properties:
+      name: postgresql
+      environment:
+        POSTGRES_USER: cloudify
+        POSTGRES_PASSWORD: cloudify
+        POSTGRES_DB: cloudify_db
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+      - type: docker2.container_from_image
+        target: postgresql_image
+      - type: docker2.container_connected_to_network
+        target: postgres_network
+
+  rest_config_volume:
+    type: cdmb.restservice_config
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+      - type: cdmb.config_to_rabbitmq
+        target: rabbitmq
+      - type: cdmb.config_to_postgres
+        target: postgresql
+
+  rest_image:
+    type: docker2.Image
+    properties:
+      dockerfile: components/restservice/image
+      image_name: cdmb/restservice
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+
+  restservice:
+    type: docker2.Container
+    properties:
+      name: restservice
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+      - type: docker2.container_from_image
+        target: rest_image
+      - type: cdmb.restservice_to_postgres
+        target: postgres_network
+      - type: docker2.container_connected_to_volume
+        target: rest_config_volume
+      - type: docker2.container_connected_to_network
+        target: rabbitmq_network
+
   rabbitmq_network:
     type: docker2.Network
     relationships:
@@ -20,6 +88,7 @@ node_templates:
     type: docker2.Image
     properties:
       repository: rabbitmq
+      tag: management
       keep: true
     relationships:
       - type: docker2.container_inside_host
@@ -29,6 +98,9 @@ node_templates:
     type: docker2.Container
     properties:
       name: rabbitmq
+      environment:
+        RABBITMQ_DEFAULT_USER: cloudify
+        RABBITMQ_DEFAULT_PASS: c10udify
     relationships:
       - type: docker2.container_inside_host
         target: localhost
@@ -69,98 +141,27 @@ node_templates:
       - type: docker2.container_connected_to_network
         target: rabbitmq_network
 
+  nginx_config_volume:
+    type: cdmb.nginx_config
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
 
-  # elasticsearch_network:
-  #   type: docker2.Network
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
+  nginx_image:
+    type: docker2.Image
+    properties:
+      repository: nginx
+      keep: true
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
 
-  # rest_config_volume:
-  #   type: cdmb.restservice_config
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-  #     - type: cdmb.config_to_rabbitmq
-  #       target: rabbitmq
-  #     - type: cdmb.config_to_elasticsearch
-  #       target: elasticsearch
-
-  # rest_image:
-  #   type: docker2.Image
-  #   properties:
-  #     dockerfile: components/restservice/image
-  #     image_name: cdmb/restservice
-  #     keep: true
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-
-  # restservice:
-  #   type: docker2.Container
-  #   properties:
-  #     name: restservice
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-  #     - type: docker2.container_from_image
-  #       target: rest_image
-  #     - type: docker2.container_connected_to_network
-  #       target: elasticsearch_network
-  #     - type: docker2.container_connected_to_volume
-  #       target: rest_config_volume
-
-  # es_data_volume:
-  #   type: cdmb.es_data
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-
-  # es_image:
-  #   type: docker2.Image
-  #   properties:
-  #     repository: elasticsearch
-  #     tag: 1
-  #     keep: true
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-
-  # elasticsearch:
-  #   type: docker2.Container
-  #   properties:
-  #     name: elasticsearch
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-  #     - type: docker2.container_from_image
-  #       target: es_image
-  #     - type: docker2.container_connected_to_network
-  #       target: elasticsearch_network
-  #     - type: docker2.container_connected_to_volume
-  #       target: es_data_volume
-
-  # nginx_config_volume:
-  #   type: cdmb.nginx_config
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-
-  # nginx_image:
-  #   type: docker2.Image
-  #   properties:
-  #     repository: nginx
-  #     keep: true
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-
-  # nginx:
-  #   type: docker2.Container
-  #   properties:
-  #     name: nginx
-  #   relationships:
-  #     - type: docker2.container_inside_host
-  #       target: localhost
-  #     - type: docker2.container_from_image
-  #       target: nginx_image
+  nginx:
+    type: docker2.Container
+    properties:
+      name: nginx
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+      - type: docker2.container_from_image
+        target: nginx_image
