@@ -325,6 +325,7 @@ def create_volume(client, ctx):
         ctx.logger.info('Created volume {0}'.format(volume.name))
         ctx.instance.runtime_properties['volume_created'] = True
         ctx.instance.runtime_properties['volume_id'] = volume.id
+        mountpoint = volume.id
     else:
         ctx.instance.runtime_properties['volume_created'] = False
     ctx.instance.runtime_properties['volume_name'] = volume_name
@@ -363,7 +364,6 @@ def copy_to_volume(client, volume_mountpoint, source, target=None):
         cmd = ['bash', '-c', 'cp -r /mnt/source/* {0}'.format(target)]
     else:
         cmd = ['cp', '/mnt/source', target]
-    cmd.extend(['/mnt/source', target])
 
     client.images.pull('ubuntu', tag='latest')
     container = client.containers.create(

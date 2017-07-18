@@ -10,7 +10,6 @@ node_templates:
   localhost:
     type: docker2.Docker
 
-
   postgres_network:
     type: docker2.Network
     relationships:
@@ -77,6 +76,8 @@ node_templates:
         target: rest_config_volume
       - type: docker2.container_connected_to_network
         target: rabbitmq_network
+      - type: docker2.container_connected_to_network
+        target: nginx_network
 
   rabbitmq_network:
     type: docker2.Network
@@ -141,11 +142,19 @@ node_templates:
       - type: docker2.container_connected_to_network
         target: rabbitmq_network
 
+  nginx_network:
+    type: docker2.Network
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+
   nginx_config_volume:
     type: cdmb.nginx_config
     relationships:
       - type: docker2.container_inside_host
         target: localhost
+      - type: cdmb.nginx_config_to_restservice
+        target: restservice
 
   nginx_image:
     type: docker2.Image
@@ -165,3 +174,7 @@ node_templates:
         target: localhost
       - type: docker2.container_from_image
         target: nginx_image
+      - type: docker2.container_connected_to_volume
+        target: nginx_config_volume
+      - type: docker2.container_connected_to_network
+        target: nginx_network

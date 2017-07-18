@@ -1,0 +1,12 @@
+upstream cloudify-rest {
+    server {{ ctx.instance.runtime_properties.restservice_ip }}:8100;
+}
+
+
+server {
+    server_name _;
+    listen 80;
+    location / {
+        proxy_pass http://cloudify-rest;
+    }
+}

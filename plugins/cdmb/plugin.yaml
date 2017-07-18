@@ -29,21 +29,11 @@ node_types:
         start:
           implementation: cdmb.cdmb.tasks.prepare_rest_config
 
-  cdmb.es_data:
-    derived_from: docker2.Volume
-    properties:
-      mount_at:
-        default: /usr/share/elasticsearch/data
-    interfaces:
-      cloudify.interfaces.lifecycle:
-        start:
-          implementation: cdmb.cdmb.tasks.create_es_index
-
   cdmb.nginx_config:
     derived_from: docker2.Volume
     properties:
       mount_at:
-        default: /etc/nginx/nginx.conf
+        default: /etc/nginx/conf.d
     interfaces:
       cloudify.interfaces.lifecycle:
         start:
@@ -70,3 +60,10 @@ relationships:
       cloudify.interfaces.relationship_lifecycle:
         establish:
           implementation: cdmb.cdmb.tasks.prepare_database
+
+  cdmb.nginx_config_to_restservice:
+    derived_from: cloudify.relationships.depends_on
+    source_interfaces:
+      cloudify.interfaces.relationship_lifecycle:
+        preconfigure:
+          implementation: cdmb.cdmb.tasks.add_restservice_address
