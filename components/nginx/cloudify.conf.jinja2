@@ -5,7 +5,10 @@ upstream cloudify-rest {
 
 server {
     server_name _;
-    listen 80;
+    listen 443 ssl;
+    ssl_certificate /etc/rabbitmq-certs/cloudify_internal_cert.pem;
+    ssl_certificate_key /etc/rabbitmq-certs/cloudify_internal_key.pem;
+
     location / {
         proxy_pass http://cloudify-rest;
     }

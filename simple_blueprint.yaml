@@ -41,6 +41,26 @@ node_templates:
       - type: docker2.container_connected_to_network
         target: postgres_network
 
+  rabbitmq_certs_volume:
+    type: docker2.Volume
+    properties:
+      mount_at: /etc/rabbitmq-certs
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          implementation: cdmb.cdmb.tasks.prepare_rabbitmq_certs
+
+  rest_resources_volume:
+    type: docker2.Volume
+    properties:
+      mount_at: /opt/manager/resources
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+
   rest_config_volume:
     type: cdmb.restservice_config
     relationships:
@@ -78,6 +98,10 @@ node_templates:
         target: rabbitmq_network
       - type: docker2.container_connected_to_network
         target: nginx_network
+      - type: docker2.container_connected_to_volume
+        target: rest_resources_volume
+      - type: docker2.container_connected_to_volume
+        target: rabbitmq_certs_volume
 
   rabbitmq_network:
     type: docker2.Network
@@ -88,8 +112,8 @@ node_templates:
   rabbitmq_image:
     type: docker2.Image
     properties:
-      repository: rabbitmq
-      tag: management
+      dockerfile: components/rabbitmq/image
+      image_name: cdmb/rabbitmq
       keep: true
     relationships:
       - type: docker2.container_inside_host
@@ -99,9 +123,6 @@ node_templates:
     type: docker2.Container
     properties:
       name: rabbitmq
-      environment:
-        RABBITMQ_DEFAULT_USER: cloudify
-        RABBITMQ_DEFAULT_PASS: c10udify
     relationships:
       - type: docker2.container_inside_host
         target: localhost
@@ -109,6 +130,8 @@ node_templates:
         target: rabbitmq_image
       - type: docker2.container_connected_to_network
         target: rabbitmq_network
+      - type: docker2.container_connected_to_volume
+        target: rabbitmq_certs_volume
 
   mgmtworker_config_volume:
     type: cdmb.mgmtworker_config
@@ -117,6 +140,8 @@ node_templates:
         target: localhost
       - type: cdmb.config_to_rabbitmq
         target: rabbitmq
+      - type: cdmb.nginx_config_to_restservice
+        target: nginx
 
   mgmtworker_image:
     type: docker2.Image
@@ -141,6 +166,10 @@ node_templates:
         target: mgmtworker_image
       - type: docker2.container_connected_to_network
         target: rabbitmq_network
+      - type: docker2.container_connected_to_volume
+        target: rabbitmq_certs_volume
+      - type: docker2.container_connected_to_network
+        target: nginx_network
 
   nginx_network:
     type: docker2.Network
@@ -178,3 +207,5 @@ node_templates:
         target: nginx_config_volume
       - type: docker2.container_connected_to_network
         target: nginx_network
+      - type: docker2.container_connected_to_volume
+        target: rabbitmq_certs_volume

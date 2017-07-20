@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import shutil
 import tempfile
 
@@ -49,12 +50,14 @@ def prepare_mgmtworker_config(client, ctx):
     volume_mountpoint = ctx.instance.runtime_properties['volume_mountpoint']
     config_dir = tempfile.mkdtemp(prefix='mgmtworker-config-')
 
-    ctx.instance.runtime_properties['rest_host'] = 'localhost'
-    ctx.instance.runtime_properties['rest_port'] = 80
-    ctx.instance.runtime_properties['rest_protocol'] = 'http'
-    ctx.instance.runtime_properties['file_server_host'] = 'localhost'
-    ctx.instance.runtime_properties['file_server_port'] = 80
-    ctx.instance.runtime_properties['file_server_protocol'] = 'http'
+    ctx.instance.runtime_properties['rest_host'] \
+        = ctx.instance.runtime_properties['restservice_ip']
+    ctx.instance.runtime_properties['rest_port'] = 443
+    ctx.instance.runtime_properties['rest_protocol'] = 'https'
+    ctx.instance.runtime_properties['file_server_host'] = \
+        ctx.instance.runtime_properties['restservice_ip']
+    ctx.instance.runtime_properties['file_server_port'] = 443
+    ctx.instance.runtime_properties['file_server_protocol'] = 'https'
 
     ctx.download_resource_and_render(
         'components/mgmtworker/env.jinja2',
@@ -63,7 +66,12 @@ def prepare_mgmtworker_config(client, ctx):
     with open(os.path.join(config_dir, 'broker_config.json'), 'w') as f:
         json.dump({
             'broker_hostname': ctx.instance.runtime_properties[
-                'rabbitmq_endpoint_ip']
+                'rabbitmq_endpoint_ip'],
+            'broker_username': 'cloudify',
+            'broker_password': 'c10udify',
+            'broker_vhost': '/',
+            'broker_ssl_enabled': 'true',
+            'broker_cert_path': '/etc/rabbitmq-certs/cloudify_internal_cert.pem'  # NOQA
         }, f)
     try:
         copy_to_volume(client, volume_mountpoint, config_dir)
@@ -103,3 +111,33 @@ def add_restservice_address(ctx):
     ctx.source.instance.runtime_properties['restservice_ip'] = \
         ctx.target.instance.runtime_properties['networks'][
         'nginx_network']['ip']
+
+
+@with_docker_client()
+def prepare_rabbitmq_certs(client, ctx):
+    volume_mountpoint = ctx.instance.runtime_properties['volume_mountpoint']
+    volumes_config = {
+        volume_mountpoint: {'bind': '/mnt/target'},
+    }
+
+    client.images.pull('frapsoft/openssl')
+    container = client.containers.create(
+        image='frapsoft/openssl',
+        name='rabbitmq_cert_writer',
+        volumes=volumes_config,
+        command=[
+            'req', '-x509', '-newkey', 'rsa:2048',
+            '-keyout', '/mnt/target/cloudify_internal_key.pem',
+            '-out', '/mnt/target/cloudify_internal_cert.pem',
+            '-days', '3650', '-batch', '-nodes'
+        ])
+
+    try:
+        container.start()
+        while True:
+            time.sleep(0.1)
+            container.reload()
+            if container.status == 'exited':
+                break
+    finally:
+        container.remove()

@@ -10,6 +10,7 @@
     amqp_host: '{{ ctx.instance.runtime_properties.rabbitmq_endpoint_ip }}',
     amqp_username: 'cloudify',
     amqp_password: 'c10udify',
+    amqp_ca_path: '/etc/rabbitmq-certs/cloudify_internal_cert.pem',
     file_server_url: 'http://localhost:53229',
     file_server_root: '/opt/manager/resources',
     maintenance_folder: '/opt/manager/maintenance'
