@@ -213,6 +213,7 @@ def create_container(client, ctx, **override_parameters):
     if set(networks) & set(connected_containers_networks):
         raise RuntimeError('Overlapping networks? {0} vs {1}'
                            .format(networks, connected_containers_networks))
+    network_aliases = ctx.node.properties['network_aliases']
 
     networks.update(connected_containers_networks)
 
@@ -238,8 +239,14 @@ def create_container(client, ctx, **override_parameters):
     container = client.containers.create(**parameters)
 
     for network in networks:
+        if isinstance(network_aliases, dict):
+            aliases = network_aliases.get(network)
+        else:
+            aliases = network_aliases
+        if not aliases:
+            aliases = [ctx.node.id]
         net = client.networks.get(network)
-        net.connect(container)
+        net.connect(container, aliases=aliases)
 
     ctx.instance.runtime_properties['container_id'] = container.id
     ctx.instance.runtime_properties['networks'] = networks

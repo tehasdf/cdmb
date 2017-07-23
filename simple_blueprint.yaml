@@ -170,6 +170,20 @@ node_templates:
         target: rabbitmq_certs_volume
       - type: docker2.container_connected_to_network
         target: nginx_network
+      - type: docker2.container_connected_to_volume
+        target: nginx_certs_volume
+
+  nginx_certs_volume:
+    type: docker2.Volume
+    properties:
+      mount_at: /etc/nginx-certs
+    relationships:
+      - type: docker2.container_inside_host
+        target: localhost
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          implementation: cdmb.cdmb.tasks.prepare_nginx_certs
 
   nginx_network:
     type: docker2.Network
@@ -198,6 +212,8 @@ node_templates:
     type: docker2.Container
     properties:
       name: nginx
+      network_aliases:
+        nginx_network: [nginx]
     relationships:
       - type: docker2.container_inside_host
         target: localhost
@@ -208,4 +224,4 @@ node_templates:
       - type: docker2.container_connected_to_network
         target: nginx_network
       - type: docker2.container_connected_to_volume
-        target: rabbitmq_certs_volume
+        target: nginx_certs_volume

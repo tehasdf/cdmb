@@ -99,6 +99,8 @@ node_types:
         default: ''
       environment:
         default: {}
+      network_aliases:
+        default: {}
     interfaces:
       cloudify.interfaces.lifecycle:
         create:

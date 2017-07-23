@@ -50,12 +50,10 @@ def prepare_mgmtworker_config(client, ctx):
     volume_mountpoint = ctx.instance.runtime_properties['volume_mountpoint']
     config_dir = tempfile.mkdtemp(prefix='mgmtworker-config-')
 
-    ctx.instance.runtime_properties['rest_host'] \
-        = ctx.instance.runtime_properties['restservice_ip']
+    ctx.instance.runtime_properties['rest_host'] = 'nginx'
     ctx.instance.runtime_properties['rest_port'] = 443
     ctx.instance.runtime_properties['rest_protocol'] = 'https'
-    ctx.instance.runtime_properties['file_server_host'] = \
-        ctx.instance.runtime_properties['restservice_ip']
+    ctx.instance.runtime_properties['file_server_host'] = 'nginx'
     ctx.instance.runtime_properties['file_server_port'] = 443
     ctx.instance.runtime_properties['file_server_protocol'] = 'https'
 
@@ -130,6 +128,49 @@ def prepare_rabbitmq_certs(client, ctx):
             '-keyout', '/mnt/target/cloudify_internal_key.pem',
             '-out', '/mnt/target/cloudify_internal_cert.pem',
             '-days', '3650', '-batch', '-nodes'
+        ])
+
+    try:
+        container.start()
+        while True:
+            time.sleep(0.1)
+            container.reload()
+            if container.status == 'exited':
+                break
+    finally:
+        container.remove()
+
+
+@with_docker_client()
+def prepare_nginx_certs(client, ctx):
+    volume_mountpoint = ctx.instance.runtime_properties['volume_mountpoint']
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        f.write("""
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions=SAN
+[ req_distinguished_name ]
+commonName=nginx
+[SAN]
+subjectAltName=DNS:nginx
+""")
+
+    volumes_config = {
+        volume_mountpoint: {'bind': '/mnt/target'},
+        f.name: {'bind': '/mnt/config'}
+    }
+    client.images.pull('frapsoft/openssl')
+
+    container = client.containers.create(
+        image='frapsoft/openssl',
+        name='rabbitmq_cert_writer',
+        volumes=volumes_config,
+        command=[
+            'req', '-x509', '-newkey', 'rsa:2048',
+            '-keyout', '/mnt/target/cloudify_internal_key.pem',
+            '-out', '/mnt/target/cloudify_internal_cert.pem',
+            '-days', '3650', '-batch', '-nodes', '-subj', '/CN=nginx',
+            '-config', '/mnt/config'
         ])
 
     try:
