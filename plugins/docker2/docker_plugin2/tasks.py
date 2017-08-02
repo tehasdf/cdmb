@@ -6,7 +6,7 @@ import time
 from docker import DockerClient
 from docker.tls import TLSConfig
 
-CONTAINER_IN_HOST_TYPE = 'docker2.container_inside_host'
+CONTAINER_IN_HOST_TYPE = 'docker2.using_docker_host'
 CONNECTED_TO_CONTAINER = 'docker2.container_connected_to_container'
 CONNECTED_TO_VOLUME = 'docker2.container_connected_to_volume'
 CONNECTED_TO_NETWORK = 'docker2.container_connected_to_network'

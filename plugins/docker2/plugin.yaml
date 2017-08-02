@@ -156,7 +156,7 @@ relationships:
   docker2.container_connected_to_container:
     derived_from: cloudify.relationships.connected_to
 
-  docker2.container_inside_host:
+  docker2.using_docker_host:
     derived_from: cloudify.relationships.contained_in
 
   docker2.container_connected_to_network:
