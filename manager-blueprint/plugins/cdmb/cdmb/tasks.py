@@ -50,6 +50,7 @@ def prepare_mgmtworker_config(client, ctx):
     volume_mountpoint = ctx.instance.runtime_properties['volume_mountpoint']
     config_dir = tempfile.mkdtemp(prefix='mgmtworker-config-')
 
+    # just using the container name available via network, not the ip
     ctx.instance.runtime_properties['rest_host'] = 'nginx'
     ctx.instance.runtime_properties['rest_port'] = 443
     ctx.instance.runtime_properties['rest_protocol'] = 'https'
@@ -69,7 +70,8 @@ def prepare_mgmtworker_config(client, ctx):
             'broker_password': 'c10udify',
             'broker_vhost': '/',
             'broker_ssl_enabled': 'true',
-            'broker_cert_path': '/etc/rabbitmq-certs/cloudify_internal_cert.pem'  # NOQA
+            'broker_cert_path':
+            '/etc/rabbitmq-certs/cloudify_internal_cert.pem'
         }, f)
     try:
         copy_to_volume(client, volume_mountpoint, config_dir)
