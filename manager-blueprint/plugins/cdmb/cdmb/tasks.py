@@ -4,6 +4,7 @@ import time
 import shutil
 import tempfile
 
+import docker.errors
 from docker_plugin2.tasks import with_docker_client, copy_to_volume
 
 
@@ -120,7 +121,11 @@ def prepare_rabbitmq_certs(client, ctx):
         volume_mountpoint: {'bind': '/mnt/target'},
     }
 
-    client.images.pull('frapsoft/openssl')
+    try:
+        client.images.get('frapsoft/openssl')
+    except docker.errors.ImageNotFound:
+        client.images.pull('frapsoft/openssl')
+
     container = client.containers.create(
         image='frapsoft/openssl',
         name='rabbitmq_cert_writer',
@@ -161,7 +166,10 @@ subjectAltName=DNS:nginx
         volume_mountpoint: {'bind': '/mnt/target'},
         f.name: {'bind': '/mnt/config'}
     }
-    client.images.pull('frapsoft/openssl')
+    try:
+        client.images.get('frapsoft/openssl')
+    except docker.errors.ImageNotFound:
+        client.images.pull('frapsoft/openssl')
 
     container = client.containers.create(
         image='frapsoft/openssl',
