@@ -1,0 +1,4 @@
+Dockerfile
+create_tables_and_add_defaults.py
+docker-entrypoint.sh
+rest-requirements.txt

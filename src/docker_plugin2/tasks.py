@@ -2,7 +2,9 @@
 from functools import wraps
 import os
 import time
+import tempfile
 
+import docker.errors
 from docker import DockerClient
 from docker.tls import TLSConfig
 
@@ -81,37 +83,53 @@ def with_docker_client(settings_from=None):
     return decorator
 
 
+def _get_build_path(download_func, base_path):
+    build_dir = tempfile.mkdtemp()
+    try:
+        files_lst = download_func(os.path.join(base_path, 'files.lst'))
+    except IOError:
+        files = ['Dockerfile']
+    else:
+        with open(files_lst) as f:
+            files = [filename for filename in f if filename.strip()]
+
+    for filename in files:
+        download_func(os.path.join(base_path, filename),
+                      target_path=os.path.join(build_dir, filename))
+    return build_dir
+
+
 @with_docker_client()
 def build_image(client, ctx):
     if ctx.node.properties.get('repository'):
-        ctx.logger.info('Pulling {0}:{1}'.format(
-            ctx.node.properties['repository'],
-            ctx.node.properties['tag']))
+        tag = ctx.node.properties.get('tag') or 'latest'
+        name = '{0}:{1}'.format(ctx.node.properties['repository'], tag)
+        try:
+            client.images.get(name)
+        except docker.errors.ImageNotFound:
+            ctx.logger.info('Pulling {0}:{1}'.format(name))
 
-        image = client.images.pull(
-            ctx.node.properties['repository'],
-            tag=ctx.node.properties['tag'])
+            image = client.images.pull(
+                ctx.node.properties['repository'],
+                tag=ctx.node.properties['tag'])
 
-        ctx.instance.runtime_properties['image'] = '{0}:{1}'.format(
-            ctx.node.properties['repository'],
-            ctx.node.properties['tag'])
-        return
+        ctx.instance.runtime_properties['image'] = name
+    else:
+        name = ctx.node.properties['image_name']
+        dockerfile = ctx.node.properties['dockerfile']
+        try:
+            image = client.images.get(name)
+        except docker.errors.ImageNotFound:
+            path = _get_build_path(ctx.download_resource, dockerfile)
+            image = client.images.build(path=path, tag=name, rm=True,
+                                        forcerm=True)
+            ctx.logger.info('Building {0} from {1}'.format(name, dockerfile))
 
-    image = client.images.build(
-        path=ctx.node.properties['dockerfile'],
-        tag=ctx.node.properties['image_name'],
-        rm=True,
-        forcerm=True
-    )
-    ctx.logger.info('Building {0} from {1}'.format(
-        ctx.node.properties['image_name'],
-        ctx.node.properties['dockerfile']))
+            if not image.id:
+                raise RuntimeError('Didnt build?')
 
-    if not image.id:
-        raise RuntimeError('Didnt build?')
-
-    ctx.logger.info('Built {0}'.format(image.id))
-    ctx.instance.runtime_properties['image'] = image.id
+            ctx.logger.info('Built {0}'.format(image.id))
+        ctx.instance.runtime_properties['image'] = image.id
 
 
 @with_docker_client()
@@ -372,7 +390,11 @@ def copy_to_volume(client, volume_mountpoint, source, target=None):
     else:
         cmd = ['cp', '/mnt/source', target]
 
-    client.images.pull('ubuntu', tag='latest')
+    try:
+        client.images.get('ubuntu:latest')
+    except docker.errors.ImageNotFound:
+        client.images.pull('ubuntu', tag='latest')
+
     container = client.containers.create(
         image='ubuntu:latest',
         name='mgmtworker_config_writer',
