@@ -1,0 +1,95 @@
+# blueprint that is equivalent to a example docker-compose file from
+# https://docs.docker.com/compose/networking/#specifying-custom-networks
+
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - ../../types.yaml
+  - ../../plugin.yaml
+
+
+node_templates:
+
+  localhost:
+    type: docker2.Docker
+
+  proxy_image:
+    type: docker2.Image
+    properties:
+      repository: proxy
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+
+  app_image:
+    type: docker2.Image
+    properties:
+      repository: proxy
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+
+  db_image:
+    type: docker2.Image
+    properties:
+      repository: proxy
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+
+  frontend_network:
+    type: docker2.Network
+    properties:
+      name: frontend
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+
+  backend_network:
+    type: docker2.Network
+    properties:
+      name: frontend
+      driver: custom-driver
+      options:
+
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+      -
+  proxy:
+    type: docker2.Container
+    properties:
+      name: proxy
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+      - type: docker2.container_from_image
+        target: proxy_image
+      - type: docker2.container_connected_to_network
+        target: frontend_network
+
+  app:
+    type: docker2.Container
+    properties:
+      name: proxy
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+      - type: docker2.container_from_image
+        target: app_image
+      - type: docker2.container_connected_to_network
+        target: frontend
+      - type: docker2.container_connected_to_network
+        target: backend
+
+  db:
+    type: docker2.Container
+    properties:
+      name: proxy
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+      - type: docker2.container_from_image
+        target: db_image
+      - type: docker2.container_connected_to_network
+        target: backend_network
