@@ -1,0 +1,30 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - ../../types.yaml
+  - ../../plugin.yaml
+
+
+node_templates:
+
+  localhost:
+    type: docker2.Docker
+
+  nginx_image:
+    type: docker2.Image
+    properties:
+      repository: nginx
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+
+  nginx:
+    type: docker2.Container
+    properties:
+      name: nginx
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+      - type: docker2.container_from_image
+        target: nginx_image
+
