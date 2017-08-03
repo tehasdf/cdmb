@@ -318,12 +318,18 @@ def delete_container(client, ctx):
 def create_network(client, ctx):
     props = ctx.node.properties
     network_name = ctx.node.properties['name'] or ctx.node.name
+    try:
+        network = client.networks.get(network_name)
+    except docker.errors.NotFound:
+        network = client.networks.create(
+            name=network_name,
+            driver=props['driver'],
+            options=props['options']
+        )
+    else:
+        raise RuntimeError('Network {0} already exists: {1}'
+                           .format(network_name, network))
 
-    network = client.networks.create(
-        name=network_name,
-        driver=props['driver'],
-        options=props['options']
-    )
     ctx.logger.info('Created network: {0}'.format(network.name))
     ctx.instance.runtime_properties['network_id'] = network.id
     ctx.instance.runtime_properties['network_name'] = network_name

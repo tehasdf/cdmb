@@ -32,7 +32,8 @@ def _init_db_tables(config):
     )
     with app.app_context():
         print 'Creating tables in the DB'
-        upgrade(directory='/opt/cloudify-manager/resources/rest-service/cloudify/migrations/')  # NOQA
+        upgrade(directory='/opt/cloudify-manager/'
+                          'resources/rest-service/cloudify/migrations/')
 
 
 def _add_default_user_and_tenant(config, amqp_manager):
