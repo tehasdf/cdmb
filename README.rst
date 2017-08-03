@@ -16,6 +16,8 @@ Installing the manager blueprint
 The blueprint is inside the manager-blueprint subdirectory.
 Use cfy local to install it, eg. like this:
 
+.. code-block:: bash
+
     cfy init -b bp manager-blueprint/simple_blueprint.yaml
     cfy exec start -b bp install
     cfy deployment outputs -b bp # to see the allocated IP
