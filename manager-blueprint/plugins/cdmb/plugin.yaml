@@ -39,6 +39,10 @@ node_types:
         start:
           implementation: cdmb.cdmb.tasks.prepare_nginx_config
 
+  cdmb.provider_context:
+    derived_from: cloudify.nodes.Root
+
+
 relationships:
   cdmb.config_to_rabbitmq:
     derived_from: cloudify.relationships.depends_on
@@ -67,3 +71,17 @@ relationships:
       cloudify.interfaces.relationship_lifecycle:
         preconfigure:
           implementation: cdmb.cdmb.tasks.add_restservice_address
+
+  cdmb.provider_context_to_api:
+    derived_from: cloudify.relationships.depends_on
+    source_interfaces:
+      cloudify.interfaces.relationship_lifecycle:
+        establish:
+          implementation: cdmb.cdmb.tasks.update_provider_context
+
+  cdmb.api_using_external_network:
+    derived_from: cloudify.relationships.connected_to
+    source_interfaces:
+      cloudify.interfaces.relationship_lifecycle:
+        preconfigure:
+          implementation: cdmb.cdmb.tasks.set_provider_context_network

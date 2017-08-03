@@ -10,6 +10,15 @@ node_templates:
   localhost:
     type: docker2.Docker
 
+  external_network:
+    type: docker2.Network
+    properties:
+      name: bridge
+      external: true
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+
   postgres_network:
     type: docker2.Network
     relationships:
@@ -225,3 +234,18 @@ node_templates:
         target: nginx_network
       - type: docker2.container_connected_to_volume
         target: nginx_certs_volume
+
+  provider_context:
+    type: cdmb.provider_context
+    relationships:
+      - type: docker2.using_docker_host
+        target: localhost
+      - type: cdmb.api_using_external_network
+        target: external_network
+      - type: cdmb.provider_context_to_api
+        target: nginx
+
+
+outputs:
+  manager_ip:
+    value: { get_attribute: [provider_context, api_addr] }

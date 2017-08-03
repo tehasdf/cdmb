@@ -7,6 +7,8 @@ import tempfile
 import docker.errors
 from docker_plugin2.tasks import with_docker_client, copy_to_volume
 
+from cloudify_rest_client import CloudifyClient
+
 
 @with_docker_client()
 def prepare_rest_config(client, ctx):
@@ -192,3 +194,33 @@ subjectAltName=DNS:nginx
                 break
     finally:
         container.remove()
+
+
+@with_docker_client('target')
+def set_provider_context_network(client, ctx):
+    print ctx
+    ctx.source.instance.runtime_properties['network_id'] = \
+        ctx.target.instance.runtime_properties['network_id']
+
+
+@with_docker_client('target')
+def update_provider_context(client, ctx):
+    api_container = client.containers.get(
+        ctx.target.instance.runtime_properties['container_id'])
+    external_network_id = ctx.source.instance.runtime_properties['network_id']
+
+    api_addr = None
+    for network in api_container.attrs['NetworkSettings']['Networks'].values():
+        if network['NetworkID'] == external_network_id:
+            api_addr = network['IPAddress']
+            break
+    else:
+        raise RuntimeError('api container not connected to external network?')
+
+    ctx.source.instance.runtime_properties['api_addr'] = api_addr
+
+    c = CloudifyClient(api_addr, username='admin', password='admin',
+                       tenant='default_tenant', port=443, trust_all=True,
+                       protocol='https')
+
+    c.manager.create_context(name='provider', context={})
