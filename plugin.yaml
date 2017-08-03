@@ -24,40 +24,6 @@ node_types:
         create:
           implementation: docker2.docker_plugin2.tasks.prepare_client
 
-  docker2.machine.Docker:
-    derived_from: docker2.Docker
-    properties:
-      name:
-        type: string
-        default: null
-      driver:
-        type: string
-        default: virtualbox
-      external:
-        type: boolean
-        default: false
-      keep:
-        type: boolean
-        default: false
-    interfaces:
-      cloudify.interfaces.lifecycle:
-        create:
-          implementation: docker2.docker_plugin2.machine.create_machine
-        delete:
-          implementation: docker2.docker_plugin2.machine.delete_machine
-
-  docker2.SwarmNode:
-    derived_from: cloudify.nodes.Root
-    properties:
-      swarm_port:
-        default: 5000
-      swarm_init:
-        default: false
-    interfaces:
-      cloudify.interfaces.lifecycle:
-        create:
-          implementation: docker2.docker_plugin2.swarm.start_swarm
-
   docker2.Image:
     derived_from: cloudify.nodes.Root
     properties:
