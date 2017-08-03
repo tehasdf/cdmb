@@ -318,17 +318,24 @@ def delete_container(client, ctx):
 def create_network(client, ctx):
     props = ctx.node.properties
     network_name = ctx.node.properties['name'] or ctx.node.name
+    external = ctx.node.properties['external']
+
+    network = None
     try:
         network = client.networks.get(network_name)
     except docker.errors.NotFound:
+        if external:
+            raise
+
+    if not external:
+        if network:
+            raise RuntimeError('Network {0} already exists'
+                               .format(network_name))
         network = client.networks.create(
             name=network_name,
             driver=props['driver'],
             options=props['options']
         )
-    else:
-        raise RuntimeError('Network {0} already exists: {1}'
-                           .format(network_name, network))
 
     ctx.logger.info('Created network: {0}'.format(network.name))
     ctx.instance.runtime_properties['network_id'] = network.id
@@ -338,6 +345,8 @@ def create_network(client, ctx):
 @with_docker_client()
 def delete_network(client, ctx):
     if 'network_id' in ctx.instance.runtime_properties:
+        if ctx.node.properties['external']:
+            return
         network = client.networks.get(
             ctx.instance.runtime_properties['network_id'])
         network.remove()

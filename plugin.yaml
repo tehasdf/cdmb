@@ -123,6 +123,9 @@ node_types:
         default: null
       options:
         default: {}
+      external:
+        type: boolean
+        default: false
     interfaces:
       cloudify.interfaces.lifecycle:
         configure:
