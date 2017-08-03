@@ -1,8 +1,8 @@
 plugins:
   cdmb:
     executor: central_deployment_agent
-    install: false
-
+    install: true
+    source: cdmb
 
 node_types:
   cdmb.mgmtworker_config:
