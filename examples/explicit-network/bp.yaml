@@ -1,0 +1,56 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - ../../types.yaml
+  - ../../plugin.yaml
+
+
+node_templates:
+  alpine_image:
+    type: docker2.Image
+    properties:
+      repository: alpine
+      keep: true
+
+  network:
+    type: docker2.Network
+
+  host_a:
+    type: docker2.Container
+    properties:
+      command: [sleep, "5"]  # stay up for a while so we can be pinged
+    relationships:
+      - type: docker2.container_from_image
+        target: alpine_image
+      - type: docker2.container_connected_to_network
+        target: network
+
+  host_b:
+    type: docker2.Container
+    properties:
+      command: [sleep, "5"]  # stay up for a while so we can be pinged
+      network_aliases:
+        network: [alias1, alias2]
+    relationships:
+      - type: docker2.container_from_image
+        target: alpine_image
+      - type: docker2.container_connected_to_network
+        target: network
+
+  host_c:
+    type: docker2.Container
+    properties:
+      command:
+        - sh
+        - "-c"
+        - "ping host_a -c 1 && ping alias1 -c 1 && ping alias2 -c 1"
+    relationships:
+      - type: docker2.container_from_image
+        target: alpine_image
+      - type: docker2.container_connected_to_network
+        target: network
+      # so that the other containers run first, before we start pinging
+      - type: cloudify.relationships.depends_on
+        target: host_a
+      - type: cloudify.relationships.depends_on
+        target: host_b
