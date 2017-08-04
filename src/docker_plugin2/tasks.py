@@ -52,7 +52,11 @@ def prepare_client(ctx, **override_connkwargs):
 def docker_client_for_instance(instance):
     host_rels = find_relationship(instance.relationships,
                                   CONTAINER_IN_HOST_TYPE)
-    if len(host_rels) != 1:
+    if not host_rels:
+        # no docker host relationship, just connect to localhost
+        return DockerClient()
+
+    if len(host_rels) > 1:
         raise RuntimeError('{0} needs one relationship to a host but has {1}'
                            .format(instance.node.name, len(host_rels)))
 
@@ -91,7 +95,7 @@ def _get_build_path(download_func, base_path):
         files = ['Dockerfile']
     else:
         with open(files_lst) as f:
-            files = [filename for filename in f if filename.strip()]
+            files = [filename.strip() for filename in f if filename.strip()]
 
     for filename in files:
         download_func(os.path.join(base_path, filename),
@@ -107,7 +111,7 @@ def build_image(client, ctx):
         try:
             client.images.get(name)
         except docker.errors.ImageNotFound:
-            ctx.logger.info('Pulling {0}:{1}'.format(name))
+            ctx.logger.info('Pulling {0}'.format(name))
 
             image = client.images.pull(
                 ctx.node.properties['repository'],
@@ -135,8 +139,7 @@ def build_image(client, ctx):
 @with_docker_client()
 def delete_image(client, ctx):
     if not ctx.node.properties.get('keep'):
-        image = client.images.get(ctx.instance.runtime_properties['image'])
-        image.remove()
+        client.images.remove(ctx.instance.runtime_properties['image'])
 
 
 def find_image(ctx):
@@ -194,7 +197,7 @@ def make_connected_containers_networks(client, ctx, connected_containers):
         )
         network.connect(container)
         target_ip = None
-        while not target_ip:
+        while not target_ip and container.status != 'exited':
             try:
                 target_ip = container.attrs['NetworkSettings']['Networks'][
                     network_name]['IPAddress']
@@ -247,7 +250,7 @@ def create_container(client, ctx, **override_parameters):
         'image': image,
         'volumes': volumes_config,
         'command': ctx.node.properties['command'],
-        'name': ctx.node.properties['name'],
+        'name': ctx.node.properties['name'] or ctx.node.name,
         'ports': ctx.node.properties['port_bindings'],
         'environment': ctx.node.properties['environment']
     }
@@ -271,7 +274,6 @@ def create_container(client, ctx, **override_parameters):
     ctx.instance.runtime_properties['volumes'] = volumes
     ctx.instance.runtime_properties['image'] = image
     ctx.instance.runtime_properties['connected'] = connected_containers_details
-    ctx.instance.runtime_properties['host_ip'] = ctx.instance.host_ip
 
 
 @with_docker_client()
@@ -293,9 +295,13 @@ def start_container(client, ctx):
 @with_docker_client()
 def stop_container(client, ctx):
     if 'container_id' in ctx.instance.runtime_properties:
-        container = client.containers.get(
-            ctx.instance.runtime_properties['container_id'])
-        container.stop()
+        try:
+            container = client.containers.get(
+                ctx.instance.runtime_properties['container_id'])
+        except docker.errors.NotFound:
+            pass
+        else:
+            container.stop()
 
 
 @with_docker_client()
@@ -309,9 +315,13 @@ def delete_container(client, ctx):
         network.remove()
 
     if 'container_id' in ctx.instance.runtime_properties:
-        container = client.containers.get(
-            ctx.instance.runtime_properties['container_id'])
-        container.remove()
+        try:
+            container = client.containers.get(
+                ctx.instance.runtime_properties['container_id'])
+        except docker.errors.NotFound:
+            pass
+        else:
+            container.remove()
 
 
 @with_docker_client()
