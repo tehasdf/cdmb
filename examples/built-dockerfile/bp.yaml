@@ -1,0 +1,22 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - ../../types.yaml
+  - ../../plugin.yaml
+
+
+node_templates:
+  helloworld_image:
+    type: docker2.Image
+    properties:
+      dockerfile: image/
+      image_name: examples/helloworld
+
+  helloworld:
+    type: docker2.Container
+    properties:
+      name: hw
+      command: [python, /opt/script.py]
+    relationships:
+      - type: docker2.container_from_image
+        target: helloworld_image
