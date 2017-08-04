@@ -42,6 +42,7 @@ node_types:
       keep:
         type: boolean
         default: false
+        description: if true, don't delete the image on uninstall
     interfaces:
       cloudify.interfaces.lifecycle:
         create:
